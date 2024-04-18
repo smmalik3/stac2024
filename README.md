@@ -84,12 +84,23 @@ Salesforce Code Repo
 
 ## Salesforce Config
 
-1. Authenticate with SF org
+1. Authenticate with SF org from **CLI**
  ```
  sf org login web --instance-url https://stac1-2024.my.salesforce.com/ --alias stac2024
  ```
-2. Authorize the Salesforce Org in VS Code
+2. Authorize the Salesforce Org in **VS Code**
  - First, open a new VS Code Window and open the salesforce folder from the stac2024 repo, you do not want to select the stac2024 folder, you want to select the salesforce folder so it looks like this is the root folder in VS Code
  - Make sure you have the Salesforce Extensions installed on your VS Code
  ![Salesforce Extensions in VS Code](/assets/sfExtensionVSCode.png)
  - Then follow this guide on how to authorize your org: https://medium.com/@mariano.padularrosa/how-to-authorize-a-salesforce-org-from-vscode-178e17d73acc
+3. Update manifest (salesforce/manifest/package.xml) to retrieve and deploy more components, see example below on how to add APEX Classes and LWCs
+```
+<types>
+        <members>APEX_CLASS_NAME</members>
+		<name>ApexClass</name>
+	</types>
+	<types>
+        <members>LWC_NAME</members>
+		<name>LightningComponentBundle</name>
+	</types>
+```

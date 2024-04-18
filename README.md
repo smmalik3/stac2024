@@ -4,7 +4,6 @@ Lost Sharks STAC Team Code Repo - 2024
 AWS infrastructure deployed and managed by Terraform
 Salesforce Code Repo
 
-
 ## Setting things up
 
 1. Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
@@ -82,3 +81,15 @@ Salesforce Code Repo
         - Example: ` ./deploy.sh terraform fileUploaded`
 6. Make updates on a feature branch
 7. Please create a PR and have one Approval before merging code
+
+## Salesforce Config
+
+1. Authenticate with SF org
+ ```
+ sf org login web --instance-url https://stac1-2024.my.salesforce.com/ --alias stac2024
+ ```
+2. Authorize the Salesforce Org in VS Code
+ - First, open a new VS Code Window and open the salesforce folder from the stac2024 repo, you do not want to select the stac2024 folder, you want to select the salesforce folder so it looks like this is the root folder in VS Code
+ - Make sure you have the Salesforce Extensions installed on your VS Code
+ ![Salesforce Extensions in VS Code](/assets/sfExtensionVSCode.png)
+ - Then follow this guide on how to authorize your org: https://medium.com/@mariano.padularrosa/how-to-authorize-a-salesforce-org-from-vscode-178e17d73acc

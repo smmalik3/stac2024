@@ -11,10 +11,10 @@ terraform {
 
 terraform {
   backend "s3" {
-    bucket         = "terraformstatestorage-stac2024"
+    bucket         = "terraformstatestorage-stac2023-1"
     key            = "terraformstate/terraform.tfstate"
-    region         = "us-east-2"
-    dynamodb_table = "terraformstatedb-stac2024"
+    region         = "us-east-1"
+    dynamodb_table = "terraformstatedb-stac2023-1"
   }
 }
 

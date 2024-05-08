@@ -190,3 +190,86 @@ resource "aws_iam_role_policy_attachment" "lambda_logs_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
   role       = aws_iam_role.lambda_role.name
 }
+
+# resources for Amazon Translate
+
+resource "aws_iam_policy" "translate_policy" {
+  name        = "translate_policy"
+  description = "A policy that allows translation via Amazon Translate"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action = [
+        "translate:TranslateText"
+      ],
+      Effect   = "Allow",
+      Resource = "*"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_translate_attach" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.translate_policy.arn
+}
+
+resource "aws_lambda_function" "translate_lambda" {
+  function_name = "TranslateTextFunction"
+
+  # Assuming the ZIP file has been created and contains your Lambda code
+  s3_bucket = "your_lambda_bucket_here"
+  s3_key    = "your_lambda_function.zip"
+
+  handler = "index.handler" # The function entrypoint in your code
+  role    = aws_iam_role.lambda_role.arn
+  runtime = "nodejs12.x" # Update to the latest supported runtime for AWS Lambda
+
+  environment {
+    variables = {
+      translate_region = "us-east-1"
+    }
+  }
+}
+
+resource "aws_api_gateway_rest_api" "translate_api_gateway" {
+  name        = "TranslateApiGateway"
+  description = "API Gateway for Amazon Translate"
+}
+
+resource "aws_api_gateway_resource" "translate_resource" {
+  rest_api_id = aws_api_gateway_rest_api.translate_api_gateway.id
+  parent_id   = aws_api_gateway_rest_api.translate_api_gateway.root_resource_id
+  path_part   = "translate"
+}
+
+resource "aws_api_gateway_method" "translate_post_method" {
+  rest_api_id   = aws_api_gateway_rest_api.translate_api_gateway.id
+  resource_id   = aws_api_gateway_resource.translate_resource.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "lambda_integration" {
+  rest_api_id = aws_api_gateway_rest_api.translate_api_gateway.id
+  resource_id = aws_api_gateway_resource.translate_resource.id
+  http_method = aws_api_gateway_method.translate_post_method.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.translate_lambda.invoke_arn
+}
+
+resource "aws_api_gateway_deployment" "translate_api_deployment" {
+  depends_on = [
+    aws_api_gateway_integration.lambda_integration
+  ]
+
+  rest_api_id = aws_api_gateway_rest_api.translate_api_gateway.id
+  stage_name  = "v1"
+}
+
+# Output the HTTPS endpoint of the API Gateway to be added in Salesforce
+output "translate_api_gateway_endpoint" {
+  value = aws_api_gateway_deployment.translate_api_deployment.invoke_url
+}

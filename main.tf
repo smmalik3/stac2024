@@ -288,161 +288,86 @@ resource "aws_lambda_permission" "allow_textract_invoke" {
   source_arn      = "arn:aws:textract:us-east-1:690711176673:document-understanding-pipeline/*"
 }
 
-##
-##ServiceNow Configuration TODO: refactor into separate modules for terraform
-##
 
-resource "aws_api_gateway_rest_api" "servicenow" {
-  name        = "servicenow-api"
-  description = "ServiceNow API"
+# resources for Amazon Translate
+
+resource "aws_iam_policy" "translate_policy" {
+  name        = "translate_policy"
+  description = "A policy that allows translation via Amazon Translate"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [{
+      Action = [
+        "translate:TranslateText"
+      ],
+      Effect   = "Allow",
+      Resource = "*"
+    }]
+  })
 }
 
-resource "aws_api_gateway_resource" "servicenow" {
-  rest_api_id = aws_api_gateway_rest_api.servicenow.id
-  parent_id   = aws_api_gateway_rest_api.servicenow.root_resource_id
-  path_part   = "file-upload"
+resource "aws_iam_role_policy_attachment" "lambda_translate_attach" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.translate_policy.arn
 }
 
-resource "aws_api_gateway_method" "servicenow" {
-  rest_api_id   = aws_api_gateway_rest_api.servicenow.id
-  resource_id   = aws_api_gateway_resource.servicenow.id
+resource "aws_lambda_function" "translate_lambda" {
+  function_name = "TranslateTextFunction"
+
+  # Assuming the ZIP file has been created and contains your Lambda code
+  s3_bucket = "your_lambda_bucket_here"
+  s3_key    = "your_lambda_function.zip"
+
+  handler = "index.handler" # The function entrypoint in your code
+  role    = aws_iam_role.lambda_role.arn
+  runtime = "nodejs12.x" # Update to the latest supported runtime for AWS Lambda
+
+  environment {
+    variables = {
+      translate_region = "us-east-1"
+    }
+  }
+}
+
+resource "aws_api_gateway_rest_api" "translate_api_gateway" {
+  name        = "TranslateApiGateway"
+  description = "API Gateway for Amazon Translate"
+}
+
+resource "aws_api_gateway_resource" "translate_resource" {
+  rest_api_id = aws_api_gateway_rest_api.translate_api_gateway.id
+  parent_id   = aws_api_gateway_rest_api.translate_api_gateway.root_resource_id
+  path_part   = "translate"
+}
+
+resource "aws_api_gateway_method" "translate_post_method" {
+  rest_api_id   = aws_api_gateway_rest_api.translate_api_gateway.id
+  resource_id   = aws_api_gateway_resource.translate_resource.id
   http_method   = "POST"
   authorization = "NONE"
 }
 
-resource "aws_lambda_permission" "servicenow" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.receiveFromServiceNow.arn
-  principal     = "apigateway.amazonaws.com"
-}
+resource "aws_api_gateway_integration" "lambda_integration" {
+  rest_api_id = aws_api_gateway_rest_api.translate_api_gateway.id
+  resource_id = aws_api_gateway_resource.translate_resource.id
+  http_method = aws_api_gateway_method.translate_post_method.http_method
 
-resource "aws_api_gateway_integration" "servicenow" {
-  rest_api_id             = aws_api_gateway_rest_api.servicenow.id
-  resource_id             = aws_api_gateway_resource.servicenow.id
-  http_method             = aws_api_gateway_method.servicenow.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.receiveFromServiceNow.invoke_arn
+  uri                     = aws_lambda_function.translate_lambda.invoke_arn
 }
 
-resource "aws_api_gateway_deployment" "servicenow" {
-  depends_on  = [aws_api_gateway_integration.servicenow]
-  rest_api_id = aws_api_gateway_rest_api.servicenow.id
-  stage_name  = "prod"
-  variables = {
-    "lambdaAlias" = aws_lambda_alias.servicenow.name
-  }
-}
-
-resource "aws_lambda_alias" "servicenow" {
-  name             = "prod"
-  function_name    = aws_lambda_function.receiveFromServiceNow.function_name
-  function_version = "$LATEST"
-}
-
-resource "aws_s3_bucket" "resumeuploadsservicenow1" {
-  bucket = "resumeuploadsservicenow1"
-}
-
-resource "aws_lambda_function" "sendToServiceNow" {
-  filename         = "sendToServiceNow.zip"
-  function_name    = "sendToServiceNow"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "sendToServiceNow/handler.sendToServiceNow"
-  source_code_hash = filebase64sha256("sendToServiceNow.zip")
-  runtime          = "nodejs14.x"
-  timeout          = var.LAMBDA_TIMEOUT  // Update the timeout value in seconds
-  environment {
-    variables = {
-      BUCKET_NAME       = aws_s3_bucket.resumeuploadsservicenow1.id
-      OPENAI_API_KEY    = var.OPENAI_API_KEY
-      CLIENT_ID         = var.CLIENT_ID
-      CLIENT_SECRET     = var.CLIENT_SECRET
-      SN_USERNAME       = var.SN_USERNAME
-      SN_PASSWORD       = var.SN_PASSWORD
-      LAMBDA_TIMEOUT    = var.LAMBDA_TIMEOUT
-      SN_PATCH_URL      = var.SN_PATCH_URL
-      OPENAI_ORG_ID     = var.OPENAI_ORG_ID
-    }
-  }
+resource "aws_api_gateway_deployment" "translate_api_deployment" {
   depends_on = [
-    aws_iam_role_policy_attachment.lambda_logs_policy,
-    aws_iam_role_policy_attachment.lambda_textract_policy
+    aws_api_gateway_integration.lambda_integration
   ]
+
+  rest_api_id = aws_api_gateway_rest_api.translate_api_gateway.id
+  stage_name  = "v1"
 }
 
-resource "aws_lambda_function" "receiveFromServiceNow" {
-  filename         = "receiveFromServiceNow.zip"
-  function_name    = "receiveFromServiceNow"
-  role             = aws_iam_role.lambda_role.arn
-  handler          = "receiveFromServiceNow/handler.receiveFromServiceNow"
-  source_code_hash = filebase64sha256("receiveFromServiceNow.zip")
-  runtime          = "nodejs14.x"
-  timeout          = var.LAMBDA_TIMEOUT
-  environment {
-    variables = {
-      BUCKET_NAME       = aws_s3_bucket.resumeuploadsservicenow1.id
-      LAMBDA_TIMEOUT    = var.LAMBDA_TIMEOUT
-    }
-  }
-  depends_on = [
-    aws_iam_role_policy_attachment.lambda_logs_policy
-  ]
-}
-
-resource "aws_cloudwatch_log_group" "sendToServiceNow_logs" {
-  name              = "/aws/lambda/sendToServiceNow"
-  retention_in_days = 14
-}
-
-resource "aws_cloudwatch_log_group" "receiveFromServiceNow" {
-  name              = "/aws/lambda/receiveFromServiceNow"
-  retention_in_days = 14
-}
-
-data "aws_iam_policy_document" "lambda_logging_servicenow" {
-  statement {
-    effect = "Allow"
-
-    actions = [
-      "logs:CreateLogGroup",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents"
-    ]
-
-    resources = ["arn:aws:logs:*:*:*"]
-  }
-}
-
-resource "aws_iam_policy" "lambda_logging_servicenow" {
-  name        = "lambda_logging_servicenow"
-  path        = "/"
-  description = "IAM policy for logging from a lambda"
-  policy      = data.aws_iam_policy_document.lambda_logging_servicenow.json
-}
-
-resource "aws_s3_bucket_notification" "bucket_notification_servicenow" {
-  bucket = aws_s3_bucket.resumeuploadsservicenow1.bucket
-
-  lambda_function {
-    lambda_function_arn = aws_lambda_function.sendToServiceNow.arn
-    events              = ["s3:ObjectCreated:*"]
-  }
-}
-resource "aws_lambda_permission" "s3_permission_servicenow" {
-  statement_id  = "AllowExecutionFromS3Bucket"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.sendToServiceNow.function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = aws_s3_bucket.resumeuploadsservicenow1.arn
-}
-
-resource "aws_lambda_permission" "allow_textract_invoke_servicenow" {
-  statement_id    = "AllowTextractInvoke"
-  action          = "lambda:InvokeFunction"
-  function_name   = aws_lambda_function.sendToServiceNow.arn
-  principal       = "textract.amazonaws.com"
-  source_account  = "690711176673"  # Update with your AWS account ID
-  source_arn      = "arn:aws:textract:us-east-1:690711176673:document-understanding-pipeline/*"
+# Output the HTTPS endpoint of the API Gateway to be added in Salesforce
+output "translate_api_gateway_endpoint" {
+  value = aws_api_gateway_deployment.translate_api_deployment.invoke_url
 }

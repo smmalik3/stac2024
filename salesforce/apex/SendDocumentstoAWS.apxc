@@ -1,0 +1,94 @@
+public class SendDocumentstoAWS {   
+    public static void sendDocumentSFtoAWS(id  YOUR_DOCUMENT_ID  )
+    {
+        // Retrieve the document from Salesforce
+        ContentVersion contentVersion = [SELECT Id, Title, VersionData FROM ContentVersion WHERE Id = 'YOUR_DOCUMENT_ID'];
+       
+        // Convert the document data to Blob
+        Blob documentData = contentVersion.VersionData;
+       
+        // Upload the document to AWS S3
+        AWS.S3.S3 s3 = new AWS.S3.S3(AWS.AccessKey.get('YOUR_ACCESS_KEY'), AWS.SecretKey.get('YOUR_SECRET_KEY'));
+       
+        AWS.S3.S3.PutObjectRequest request = new AWS.S3.S3.PutObjectRequest()
+            .withBucketName('YOUR_BUCKET_NAME')
+            .withKey('YOUR_OBJECT_KEY')
+            .withContentBody(documentData.toString());
+       
+        AWS.S3.S3.PutObjectResult result = s3.putObject(request);
+       
+        System.debug('Upload successful: ' + result.toString());
+    }
+
+        //Send the XL document to AWS for testing
+    public static void sendDocumentSFtoAWSTest()
+    {
+        Xmlstreamwriter xmlW = new Xmlstreamwriter();
+        xmlW.writeStartDocument('utf-8','1.0');
+        xmlW.writeStartElement(null,'SERVICE', null);
+        xmlW.writeAttribute(null,null,'version','1.0');
+        xmlW.writeStartElement(null,'CLIENT',null);
+        xmlW.writeAttribute(null,null,'email','xx.xx@xx.xx');
+        xmlW.writeStartElement(null,'BASIC_FIELDS',null);
+        xmlW.writeAttribute(null,null,'id','1');
+
+        xmlW.writeStartElement(null,'ADRESS_LINE_1',null);
+        xmlW.writeAttribute(null,null,'id','2');
+        xmlW.writeCharacters('4 rue de rocher');
+        xmlW.writeEndElement(); //Close ADRESS_LINE_1
+
+        xmlW.writeStartElement(null,'CITY',null);
+        xmlW.writeAttribute(null,null,'id','3');
+        xmlW.writeCharacters('Paris');
+        xmlW.writeEndElement(); //Close CITY
+
+        xmlW.writeEndElement(); //Close BASIC_FIELDS
+        xmlW.writeEndElement(); //Close CLIENT
+        xmlW.writeEndElement(); //Close SERVICE
+        xmlW.writeEndDocument(); //Close XML document
+
+        String xmlStringxmlRes = xmlW.getXmlString();
+        xmlW.close();
+        Blob xmlContentBlob = Blob.valueOf(xmlStringxmlRes);
+
+        String attachmentBody = EncodingUtil.base64Encode(xmlContentBlob);
+        String formattedDateString = Datetime.now().formatGMT('EEE, dd MMM yyyy HH:mm:ss z');
+        String key = 'xxxxx'; //AWS key
+        String secret = 'xxxxxxx'; //AWS Secret key
+        String bucketname = 'emdev-test1'; //AWS bucket name
+        String host = 's3.us-east-2.amazonaws.com';
+        String method = 'PUT';
+        String filename = 'Upload-Test-1';
+
+        HttpRequest req = new HttpRequest();
+        req.setMethod(method);
+        req.setEndpoint('callout:Test1Amazons3' + '/' + filename); //virtual hosted-style request
+        //req.setEndpoint('https://' + bucketname + '.' + host + '/' + filename);
+        req.setHeader('Host', bucketname + '.' + host);
+        req.setHeader('Content-Length', String.valueOf(attachmentBody.length()));
+        req.setHeader('Content-Encoding', 'UTF-8');
+        req.setHeader('Content-type', 'application/xml');
+        req.setHeader('Connection', 'keep-alive');
+        req.setHeader('Date', formattedDateString);
+        req.setHeader('ACL', 'public-read-write');
+        Blob xmlBlob = EncodingUtil.base64Decode(attachmentBody);
+        req.setBodyAsBlob(xmlBlob);
+
+        String stringToSign = 'PUT\n\n' + 'application/xml' + '\n' + formattedDateString + '\n' + '/' + bucketname + '/' + filename;
+        Blob mac = Crypto.generateMac('HMACSHA1', blob.valueof(stringToSign), blob.valueof(secret)); //HMACSHA256
+        String signedKey  = EncodingUtil.base64Encode(mac);
+        String authHeader = 'AWS' + ' ' + key + ':' + signedKey;
+
+        req.setHeader('Authorization', authHeader);
+        Http http = new Http();
+        HTTPResponse res = http.send(req);
+
+        System.debug('>>>> The response');
+        System.debug(res);
+        System.debug('>>>> The body');
+        System.debug(res.getBody());
+        System.debug('>>>> Status code');
+        System.debug(res.getStatusCode());
+        System.debug('>>>> Finished method');
+    }
+}

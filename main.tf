@@ -135,11 +135,6 @@ resource "aws_iam_policy" "cloudwatch_policy" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "cloudwatch_policy_attachment" {
-  policy_arn = aws_iam_policy.cloudwatch_policy.arn
-  role       = aws_iam_role.api_gateway_role.name
-}
-
 resource "aws_iam_role" "lambda_role" {
   name = "lambda_exec_role"
 
@@ -214,22 +209,43 @@ resource "aws_iam_role_policy_attachment" "lambda_translate_attach" {
   policy_arn = aws_iam_policy.translate_policy.arn
 }
 
-resource "aws_lambda_function" "translate_lambda" {
-  function_name = "TranslateTextFunction"
+# resource "aws_lambda_function" "translate_lambda" {
+#   function_name = "TranslateTextFunction"
 
-  # Assuming the ZIP file has been created and contains your Lambda code
-  # s3_bucket = "your_lambda_bucket_here"
-  # s3_key    = "your_lambda_function.zip"
+#   # Assuming the ZIP file has been created and contains your Lambda code
+#   # s3_bucket = "your_lambda_bucket_here"
+#   # s3_key    = "your_lambda_function.zip"
 
-  handler = "index.handler" # The function entrypoint in your code
-  role    = aws_iam_role.lambda_role.arn
-  runtime = "nodejs18.x" # Update to the latest supported runtime for AWS Lambda
+#   handler = "index.handler" # The function entrypoint in your code
+#   role    = aws_iam_role.lambda_role.arn
+#   runtime = "nodejs18.x" # Update to the latest supported runtime for AWS Lambda
 
+#   environment {
+#     variables = {
+#       translate_region = "us-east-1"
+#     }
+#   }
+# }
+
+
+resource "aws_lambda_function" "getTranslation" {
+  filename         = "getTranslation.zip"
+  function_name    = "getTranslation"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "getTranslation/handler.getTranslation"
+  source_code_hash = filebase64sha256("getTranslation.zip")
+  runtime          = "nodejs18.x"
+  timeout          = var.LAMBDA_TIMEOUT
   environment {
     variables = {
+      BUCKET_NAME       = aws_s3_bucket.stac2024-saved-files.id
+      LAMBDA_TIMEOUT    = var.LAMBDA_TIMEOUT
       translate_region = "us-east-1"
     }
   }
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_logs_policy
+  ]
 }
 
 # resource "aws_api_gateway_rest_api" "translate_api_gateway" {

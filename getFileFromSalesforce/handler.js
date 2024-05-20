@@ -17,8 +17,8 @@ module.exports.getFile = async (event) => {
     const decodedContent = Buffer.from(content, 'base64');
 
     // Save the file to S3
-    // const bucketName = 'stac2024-saved-files';
-    const bucketName = process.env.BUCKET_1_NAME;
+    const bucketName = 'stac2024-saved-files';
+    // const bucketName = process.env.BUCKET_1_NAME;
     const key = filename;
     const params = {
       Bucket: bucketName,

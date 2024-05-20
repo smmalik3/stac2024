@@ -1,5 +1,8 @@
 const AWS = require('aws-sdk');
-const s3 = new AWS.S3();
+const textract = new AWS.Textract();
+const translate = new AWS.Translate();
+const OpenAI = require("openai");
+const axios = require('axios');
 
 module.exports.getTranslation = async (event) => {
   try {

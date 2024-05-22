@@ -1,7 +1,10 @@
 const AWS = require('aws-sdk');
-const s3 = new AWS.S3();
+const textract = new AWS.Textract();
+const translate = new AWS.Translate();
+const OpenAI = require("openai");
+const axios = require('axios');
 
-module.exports.getFile = async (event) => {
+module.exports.getTranslation = async (event) => {
   try {
     // const { content, filename } = event;
     json_event_body = JSON.stringify(event.body)
@@ -17,8 +20,8 @@ module.exports.getFile = async (event) => {
     const decodedContent = Buffer.from(content, 'base64');
 
     // Save the file to S3
-    const bucketName = 'stac2024-saved-files';
-    // const bucketName = process.env.BUCKET_1_NAME;
+    // const bucketName = 'stac2024-saved-files';
+    const bucketName = process.env.BUCKET_1_NAME;
     const key = filename;
     const params = {
       Bucket: bucketName,

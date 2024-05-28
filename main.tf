@@ -181,6 +181,16 @@ resource "aws_s3_bucket" "stac2024-saved-files" {
   }
 }
 
+resource "aws_s3_bucket" "stac2024-translated-files" {
+  bucket = "stac2024-translated-files"
+  lifecycle {
+    prevent_destroy = true
+  }
+  tags = {
+    stac2024=true
+  }
+}
+
 resource "aws_iam_role_policy_attachment" "lambda_logs_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
   role       = aws_iam_role.lambda_role.name
@@ -239,6 +249,7 @@ resource "aws_lambda_function" "getTranslation" {
   environment {
     variables = {
       BUCKET_NAME       = aws_s3_bucket.stac2024-saved-files.id
+      TRANSLATION_BUCKET_NAME = aws_s3_bucket.stac2024-translated-files.id
       LAMBDA_TIMEOUT    = var.LAMBDA_TIMEOUT
       translate_region = "us-east-1"
     }

@@ -252,6 +252,11 @@ resource "aws_lambda_function" "getTranslation" {
       TRANSLATION_BUCKET_NAME = aws_s3_bucket.stac2024-translated-files.id
       LAMBDA_TIMEOUT    = var.LAMBDA_TIMEOUT
       translate_region = "us-east-1"
+      SF_SECURITY_TOKEN = var.SF_SECURITY_TOKEN
+      SF_PASSWORD = var.SF_PASSWORD
+      SF_USERNAME = var.SF_USERNAME
+      CLIENT_SECRET = var.CLIENT_SECRET
+      CLIENT_ID = var.CLIENT_ID
     }
   }
   depends_on = [
